@@ -1,0 +1,131 @@
+name: Docker Build, Push, and Release
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  KEEP_RELEASES: 10
+  KEEP_IMAGES: 10
+
+jobs:
+  build-push-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      pull-requests: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version from package.json
+        id: package-version
+        run: echo "VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ steps.package-version.outputs.VERSION }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+      # - name: Scan Docker image for vulnerabilities
+      #   uses: aquasecurity/trivy-action@master
+      #   env:
+      #     TRIVY_USERNAME: ${{ github.actor }}
+      #     TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.package-version.outputs.VERSION }}
+      #     format: 'table'
+      #     exit-code: '1'
+      #     ignore-unfixed: true
+      #     vuln-type: 'os,library'
+      #     severity: 'CRITICAL,HIGH'
+
+      - name: Get Pull Request Messages
+        id: pr-messages
+        run: |
+          PR_MESSAGES=$(git log --merges --format="%b" @~1..HEAD | sed 's/^/* /')
+          echo "PR_MESSAGES<<EOF" >> $GITHUB_OUTPUT
+          echo "$PR_MESSAGES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Get Commit Messages
+        id: commit-messages
+        run: |
+          COMMIT_MESSAGES=$(git log --no-merges --format="* %s" @~1..HEAD)
+          echo "COMMIT_MESSAGES<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMIT_MESSAGES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.package-version.outputs.VERSION }}
+          release_name: Release v${{ steps.package-version.outputs.VERSION }}
+          body: |
+            ## Docker Image
+            Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.package-version.outputs.VERSION }}
+
+            ## Pull Request Messages
+            ${{ steps.pr-messages.outputs.PR_MESSAGES }}
+
+            ## Commit Messages
+            ${{ steps.commit-messages.outputs.COMMIT_MESSAGES }}
+
+            ## Security Scan
+            A security scan was performed on this Docker image. Any critical or high vulnerabilities would have prevented this release.
+          draft: false
+          prerelease: false

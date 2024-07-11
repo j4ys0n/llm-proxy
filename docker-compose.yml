@@ -1,0 +1,16 @@
+version: '3.6'
+
+services:
+  llmp:
+    image: ghcr.io/j4ys0n/llm-proxy:1.0.0
+    container_name: llmp
+    hostname: llmp
+    restart: unless-stopped
+    ports:
+      - 8080:8080
+      - 443:443
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: 100m
+        max-file: '2'
