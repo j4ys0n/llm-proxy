@@ -2,7 +2,7 @@
 
 Manages Nginx for reverse proxy to multiple LLMs, with TLS & Bearer Auth tokens. Deployed with docker.
 
-- Aggregates multiple OpenAI-type LLM APIs
+- Aggregates multiple OpenAI-type LLM APIs (all routes must be prefixed with "/v1")
 - Supports cloudflare domains
 - Uses Let's Encrypt for TLS certificates
 - Uses certbot for certificate issuance and renewal
