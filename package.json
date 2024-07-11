@@ -1,6 +1,6 @@
 {
   "name": "llm-proxy",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A Node.js application that manages Nginx",
   "main": "dist/index.js",
   "scripts": {
