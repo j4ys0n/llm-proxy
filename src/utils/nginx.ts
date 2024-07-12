@@ -112,7 +112,7 @@ export class NginxManager {
     const cloudflareFlags = cloudflare
       ? ' --dns-cloudflare --dns-cloudflare-credentials /opt/cloudflare/credentials'
       : ''
-    const command = `certbot --nginx -n --agree-tos${cloudflareFlags} ${domainArgs} --preferred-challenges dns-01`
+    const command = `certbot certonly -n --email j4ys0n@gmail.com --agree-tos${cloudflareFlags} ${domainArgs} --preferred-challenges dns-01`
     try {
       await execAsync(command)
       message = 'Certificates obtained successfully.'
