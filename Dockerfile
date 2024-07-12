@@ -2,7 +2,7 @@
 FROM node:18.20.4-bullseye
 
 # Install Nginx
-RUN apt-get update && apt-get install -y nginx certbot python3-certbot-nginx
+RUN apt-get update && apt-get install -y nginx certbot python3-certbot-dns-cloudflare
 
 # Create directory for Nginx configuration files
 RUN mkdir -p /etc/nginx/conf.d/
