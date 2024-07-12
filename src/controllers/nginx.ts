@@ -13,11 +13,11 @@ export class NginxController {
   }
 
   public registerRoutes(): void {
-    this.app.post('/nginx/reload', ...this.requestHandlers, this.reloadNginx.bind(this))
+    this.app.get('/nginx/reload', ...this.requestHandlers, this.reloadNginx.bind(this))
     this.app.post('/nginx/config/update', ...this.requestHandlers, this.updateConfig.bind(this))
     this.app.get('/nginx/config/get', ...this.requestHandlers, this.getConfig.bind(this))
     this.app.get('/nginx/config/get-default', ...this.requestHandlers, this.getDefaultConfig.bind(this))
-    this.app.get('/nginx/config/write-default', ...this.requestHandlers, this.writeDefaultConfig.bind(this))
+    this.app.post('/nginx/config/write-default', ...this.requestHandlers, this.writeDefaultConfig.bind(this))
     this.app.post('/nginx/certificates/obtain', ...this.requestHandlers, this.obtainCertificates.bind(this))
     this.app.get('/nginx/certificates/renew', ...this.requestHandlers, this.renewCertificates.bind(this))
     log('info', 'NginxController initialized')
@@ -60,13 +60,17 @@ export class NginxController {
   }
 
   private async writeDefaultConfig(req: Request, res: Response): Promise<void> {
-    if (req.body != null && req.body.domain != null) {
-      const domain = req.body.domain
-      const { success, message } = await this.nginxManager.writeDefaultTemplate(domain)
-      if (success) {
-        res.json({ success, message: 'Default config written successfully' })
+    if (req.body != null && req.body.domain != null && req.body.cidrGroups != null) {
+      const { domain, cidrGroups } = req.body
+      if (Array.isArray(cidrGroups) && typeof domain === 'string') {
+        const { success, message } = await this.nginxManager.writeDefaultTemplate(domain, cidrGroups)
+        if (success) {
+          res.json({ success, message: 'Default config written successfully' })
+        } else {
+          res.status(500).json({ success, message })
+        }
       } else {
-        res.status(500).json({ success, message })
+        res.status(400).json({ success: false, message: 'Invalid request body' })  
       }
     } else {
       res.status(400).json({ success: false, message: 'Invalid request body' })
