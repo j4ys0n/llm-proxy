@@ -34,9 +34,14 @@ export class NginxController {
   }
 
   private async updateConfig(req: Request, res: Response): Promise<void> {
-    const { success, message } = await this.nginxManager.updateConfig(req.body)
-    const status = success ? 200 : 500
-    res.status(status).json({ success, message })
+    if (req.body != null && req.body.config != null) {
+      const newConfig = req.body.config
+      const { success, message } = await this.nginxManager.updateConfig(newConfig)
+      const status = success ? 200 : 500
+      res.status(status).json({ success, message })
+    } else {
+      res.status(400).json({ success: false, message: 'Invalid request body' })
+    }
   }
 
   private async getConfig(req: Request, res: Response): Promise<void> {
@@ -55,11 +60,16 @@ export class NginxController {
   }
 
   private async writeDefaultConfig(req: Request, res: Response): Promise<void> {
-    const { success, message } = await this.nginxManager.writeDefaultTemplate()
-    if (success) {
-      res.json({ success, message: 'Default config written successfully' })
+    if (req.body != null && req.body.domain != null) {
+      const domain = req.body.domain
+      const { success, message } = await this.nginxManager.writeDefaultTemplate(domain)
+      if (success) {
+        res.json({ success, message: 'Default config written successfully' })
+      } else {
+        res.status(500).json({ success, message })
+      }
     } else {
-      res.status(500).json({ success, message })
+      res.status(400).json({ success: false, message: 'Invalid request body' })
     }
   }
 
