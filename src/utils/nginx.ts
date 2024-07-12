@@ -62,9 +62,10 @@ export class NginxManager {
     return this.putFile(this.configPath, newConfig)
   }
 
-  async writeDefaultTemplate(): Promise<NginxResponse> {
+  async writeDefaultTemplate(domain: string): Promise<NginxResponse> {
     const templateContent = await readFile(CONFIG_TEMPLATE_PATH, 'utf-8')
-    return this.putFile(this.configPath, templateContent)
+    const content = templateContent.replace(/{{domainName}}/g, domain)
+    return this.putFile(this.configPath, content)
   }
 
   async getConfig(): Promise<NginxConfigResponse> {
