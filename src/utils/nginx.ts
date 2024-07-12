@@ -21,11 +21,11 @@ const CONFIG_TEMPLATE_PATH = join(__dirname, '../static/nginx-server-template.co
 
 export class NginxManager {
   private configPath: string
-  private domains: string[]
+  // private domains: string[]
 
   constructor(configPath: string = '/etc/nginx/conf.d/server.conf', domains: string[] = []) {
     this.configPath = configPath
-    this.domains = domains
+    // this.domains = domains
   }
 
   async start(): Promise<NginxResponse> {
@@ -105,8 +105,8 @@ export class NginxManager {
     return { success, config, message }
   }
 
-  async obtainCertificates(cloudflare?: boolean): Promise<NginxResponse> {
-    const domainArgs = this.domains.map((domain) => `-d ${domain}`).join(' ')
+  async obtainCertificates(domains: string[] = [], cloudflare?: boolean): Promise<NginxResponse> {
+    const domainArgs = domains.map((domain) => `-d ${domain}`).join(' ')
     let message: string | undefined
     let success = false
     const cloudflareFlags = cloudflare

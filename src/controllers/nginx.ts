@@ -18,7 +18,7 @@ export class NginxController {
     this.app.get('/nginx/config/get', ...this.requestHandlers, this.getConfig.bind(this))
     this.app.get('/nginx/config/get-default', ...this.requestHandlers, this.getDefaultConfig.bind(this))
     this.app.get('/nginx/config/write-default', ...this.requestHandlers, this.writeDefaultConfig.bind(this))
-    this.app.get('/nginx/certificates/obtain', ...this.requestHandlers, this.obtainCertificates.bind(this))
+    this.app.post('/nginx/certificates/obtain', ...this.requestHandlers, this.obtainCertificates.bind(this))
     this.app.get('/nginx/certificates/renew', ...this.requestHandlers, this.renewCertificates.bind(this))
     log('info', 'NginxController initialized')
   }
@@ -64,9 +64,14 @@ export class NginxController {
   }
 
   private async obtainCertificates(req: Request, res: Response): Promise<void> {
-    const { success, message } = await this.nginxManager.obtainCertificates(true)
-    const status = success ? 200 : 500
-    res.status(status).json({ success, message })
+    if (req.body != null && req.body.domains != null && Array.isArray(req.body.domains)) {
+      const domains = req.body.domains
+      const { success, message } = await this.nginxManager.obtainCertificates(domains, true)
+      const status = success ? 200 : 500
+      res.status(status).json({ success, message })
+    } else {
+      res.status(400).json({ success: false, message: 'Invalid request body' })
+    }
   }
 
   private async renewCertificates(req: Request, res: Response): Promise<void> {
