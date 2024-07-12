@@ -62,7 +62,7 @@ export class LLMController {
 
   private async cacheModels() {
     while (true) {
-      await fetchModels(this.targetUrls)
+      this.modelCache = await fetchModels(this.targetUrls)
       await sleep(60000)
     }
   }
