@@ -1,5 +1,5 @@
 # Use an official Node.js runtime as the base image
-FROM node:18.20.4-buster
+FROM node:18.20.4-bullseye
 
 # Install Nginx
 RUN apt-get update && apt-get install -y nginx certbot python3-certbot-nginx
