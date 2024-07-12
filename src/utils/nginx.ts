@@ -17,7 +17,7 @@ export interface NginxConfigResponse {
   message?: string
 }
 
-const CONFIG_TEMPLATE_PATH = join(__dirname, '/src/static/nginx-server-template.conf')
+const CONFIG_TEMPLATE_PATH = join(__dirname, '../static/nginx-server-template.conf')
 
 export class NginxManager {
   private configPath: string
