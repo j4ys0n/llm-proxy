@@ -2,13 +2,19 @@ version: '3.6'
 
 services:
   llmp:
-    image: ghcr.io/j4ys0n/llm-proxy:1.0.0
+    image: ghcr.io/j4ys0n/llm-proxy:1.1.0
     container_name: llmp
     hostname: llmp
     restart: unless-stopped
     ports:
       - 8080:8080
       - 443:443
+    volumes:
+      - .env:/app/.env
+      - ./data:/app/data
+      - ./cloudflare_credentials:/opt/cloudflare/credentials
+      - ./nginx:/etc/nginx/conf.d # nginx configs
+      - ./certs:/etc/letsencrypt # tsl certificates
     logging:
       driver: 'json-file'
       options:
