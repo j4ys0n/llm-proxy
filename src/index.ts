@@ -5,6 +5,7 @@ import { LLMController } from './controllers/llm'
 import { tokenMiddleware } from './utils/auth'
 import { AuthController } from './controllers/auth'
 import { log } from './utils/general'
+import bodyParser from 'body-parser'
 
 dotenv.config()
 
@@ -12,11 +13,11 @@ const app = express()
 const port = process.env.PORT || 8080
 const targetUrls = (process.env.TARGET_URLS || 'http://example.com').split(',').map((url) => url.trim())
 
-app.use(express.json())
-
+// app.use(express.json())
+app.use(bodyParser.json())
 const payloadLimit = process.env.PAYLOAD_LIMIT || '1mb'
-app.use(express.json({ limit: payloadLimit }))
-app.use(express.urlencoded({ limit: payloadLimit, extended: true }))
+app.use(bodyParser.json({ limit: payloadLimit }))
+app.use(bodyParser.urlencoded({ extended: false, limit: payloadLimit }))
 log('info', `Payload limit is: ${payloadLimit}`)
 
 // Express routes
