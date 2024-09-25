@@ -17,7 +17,6 @@ const targetUrls = (process.env.TARGET_URLS || 'http://example.com').split(',').
 const payloadLimit = process.env.PAYLOAD_LIMIT || '1mb'
 app.use(bodyParser.json({ limit: payloadLimit }))
 app.use(bodyParser.urlencoded({ extended: false, limit: payloadLimit }))
-app.use(bodyParser.json())
 log('info', `Payload limit is: ${payloadLimit}`)
 
 // Express routes
