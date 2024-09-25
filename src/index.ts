@@ -5,6 +5,7 @@ import { NginxController } from './controllers/nginx'
 import { LLMController } from './controllers/llm'
 import { tokenMiddleware } from './utils/auth'
 import { AuthController } from './controllers/auth'
+import { log } from './utils/general'
 
 dotenv.config()
 
@@ -14,11 +15,12 @@ const targetUrls = (process.env.TARGET_URLS || 'http://example.com').split(',').
 
 app.use(express.json())
 
-const payloadLimit = process.env.PAYLOAD_LIMIT || '250kb'
+const payloadLimit = process.env.PAYLOAD_LIMIT || '1mb'
 //support application/json type post data (default limit is 100kb)
 app.use(bodyParser.json({ limit: payloadLimit }))
 //support application/x-www-form-urlencoded post data (default limit is 100kb)
 app.use(bodyParser.urlencoded({ limit: payloadLimit, extended: false }))
+log('info', `Payload limit is: ${payloadLimit}`)
 
 // Express routes
 app.get('/', (req, res) => {
