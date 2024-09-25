@@ -1,5 +1,6 @@
 import dotenv from 'dotenv'
 import express from 'express'
+import bodyParser from 'body-parser'
 import { NginxController } from './controllers/nginx'
 import { LLMController } from './controllers/llm'
 import { tokenMiddleware } from './utils/auth'
@@ -13,9 +14,15 @@ const targetUrls = (process.env.TARGET_URLS || 'http://example.com').split(',').
 
 app.use(express.json())
 
+const payloadLimit = process.env.PAYLOAD_LIMIT || '250kb'
+//support application/json type post data (default limit is 100kb)
+app.use(bodyParser.json({ limit: payloadLimit }))
+//support application/x-www-form-urlencoded post data (default limit is 100kb)
+app.use(bodyParser.urlencoded({ limit: payloadLimit, extended: false }))
+
 // Express routes
 app.get('/', (req, res) => {
-  res.send('LLM Aggregation Proxy')
+  res.send('LLM Proxy')
 })
 
 const authController = new AuthController({ app })

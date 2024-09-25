@@ -15,3 +15,7 @@ export function md5(data: Object | string): string {
 export function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms))
 }
+
+export function extractDomainName(url: string) {
+  return url.replace('https://', '').replace('http://', '').split('/')[0].replace(/\./g, '_')
+}

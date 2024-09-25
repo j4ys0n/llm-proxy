@@ -1,5 +1,5 @@
 import { Express, NextFunction, Request, RequestHandler, Response } from 'express'
-import { log, md5, sleep } from '../utils/general'
+import { log, md5, sleep, extractDomainName } from '../utils/general'
 import axios, { AxiosRequestConfig } from 'axios'
 
 export interface Model {
@@ -19,7 +19,7 @@ async function fetchModels(targetUrls: string[]): Promise<ModelMap> {
     try {
       const response = await axios.get(`${url}/v1/models`)
       const models = response.data.data || []
-
+      const hostId = extractDomainName(url)
       models.forEach((model: Model) => {
         const hash = md5(model.id)
         tmp[hash] = { url, model }
