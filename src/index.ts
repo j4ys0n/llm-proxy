@@ -14,10 +14,10 @@ const port = process.env.PORT || 8080
 const targetUrls = (process.env.TARGET_URLS || 'http://example.com').split(',').map((url) => url.trim())
 
 // app.use(express.json())
-app.use(bodyParser.json())
 const payloadLimit = process.env.PAYLOAD_LIMIT || '1mb'
 app.use(bodyParser.json({ limit: payloadLimit }))
 app.use(bodyParser.urlencoded({ extended: false, limit: payloadLimit }))
+app.use(bodyParser.json())
 log('info', `Payload limit is: ${payloadLimit}`)
 
 // Express routes
