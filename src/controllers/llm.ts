@@ -118,9 +118,9 @@ export class LLMController {
       } catch (error) {
         log(`Error forwarding request: ${(error as any).toString()}`, 'error')
         if (axios.isAxiosError(error) && error.response) {
-          log(`Error response from ${fullUrl}:`, 'error', error.response.data)
-          log(`Request body was:`, 'error', req.body)
-          res.status(error.response.status).send(error.response.data)
+          // log(`Error response from ${fullUrl}:`, 'error', error.response.data)
+          log(`Request body caused error:`, 'error', req.body)
+          res.status(error.response.status).json({ error: 'Error processing request' })
         } else {
           res.status(500).json({ error: 'Internal Server Error' })
         }
