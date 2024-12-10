@@ -36,8 +36,7 @@ function getPath(url: string): { path: string, base: string, apiKey?: string } {
 async function fetchModels(targetUrls: string[]): Promise<ModelMap> {
   const tmp: ModelMap = {}
   for (const urlAndToken of targetUrls) {
-    const [url, apiKey] = urlAndToken.split('|').map(s => s.trim())
-    const { path, base } = getPath(url)
+    const { path, base, apiKey } = getPath(urlAndToken)
     const headers: { [key: string]: string } = {
       accept: defaultContentType,
       'Content-Type': defaultContentType
@@ -47,20 +46,20 @@ async function fetchModels(targetUrls: string[]): Promise<ModelMap> {
     }
     const params = {
       method: 'GET',
-      url: `${base}/${path}/models`,
+      url: `${base}${path}/models`,
       headers
     }
     try {
       const response = await axios(params)
       const models = response.data.data || []
-      const hostId = extractDomainName(url)
+      const hostId = extractDomainName(base)
       models.forEach((model: Model) => {
         const hash = md5(model.id)
-        tmp[hash] = { url, model }
+        tmp[hash] = { url: urlAndToken, model }
       })
-      log('info', `Models cached successfully for ${url}. [${models.map((m: Model) => m.id).join(', ')}]`)
+      log('info', `Models cached successfully for ${base}. [${models.map((m: Model) => m.id).join(', ')}]`)
     } catch (error) {
-      log('error', `Error fetching models from ${url}/v1/models: ${(error as any).toString()}`)
+      log('error', `Error fetching models from ${base}${path}/models: ${(error as any).toString()}`)
     }
   }
   return tmp

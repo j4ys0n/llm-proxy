@@ -33,7 +33,7 @@ version: '3.6'
 
 services:
   llmp:
-    image: ghcr.io/j4ys0n/llm-proxy:1.5.1
+    image: ghcr.io/j4ys0n/llm-proxy:1.5.2
     container_name: llmp
     hostname: llmp
     restart: unless-stopped
