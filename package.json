@@ -1,6 +1,6 @@
 {
   "name": "llm-proxy",
-  "version": "1.5.3",
+  "version": "1.5.4",
   "description": "Manages Nginx for reverse proxy to multiple LLMs, with TLS & Bearer Auth tokens",
   "main": "dist/index.js",
   "scripts": {
