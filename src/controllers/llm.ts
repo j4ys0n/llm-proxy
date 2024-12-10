@@ -15,19 +15,43 @@ export interface ModelMap {
 
 const defaultContentType = 'application/json'
 
+function getPath(url: string): { path: string, base: string, apiKey?: string } {
+  try {
+    const urlParts = url.split('|')
+    const apiKey = urlParts.length > 1 ? urlParts[1] : undefined
+    const urlObject = new URL(url)
+    return {
+      path: urlObject.pathname || '/v1',
+      base: urlObject.origin,
+      apiKey
+    }
+  } catch (error) {
+    // Return the input if it's already a path starting with '/'
+    if (url.startsWith('/')) return { path: url, base: 'http://localhost' }
+    // Return '/v1' for invalid URLs
+    return { path: '/v1', base: 'http://localhost' }
+  }
+}
+
 async function fetchModels(targetUrls: string[]): Promise<ModelMap> {
   const tmp: ModelMap = {}
   for (const urlAndToken of targetUrls) {
     const [url, apiKey] = urlAndToken.split('|').map(s => s.trim())
-    const reqHeaders: { [key: string]: string } = {
+    const { path, base } = getPath(url)
+    const headers: { [key: string]: string } = {
       accept: defaultContentType,
       'Content-Type': defaultContentType
     }
     if (apiKey != null && apiKey !== '') {
-      reqHeaders['Authorization'] = `Bearer ${apiKey}`
+      headers['Authorization'] = `Bearer ${apiKey}`
+    }
+    const params = {
+      method: 'GET',
+      url: `${base}/${path}/models`,
+      headers
     }
     try {
-      const response = await axios.get(`${url}/v1/models`)
+      const response = await axios(params)
       const models = response.data.data || []
       const hostId = extractDomainName(url)
       models.forEach((model: Model) => {
@@ -85,26 +109,36 @@ export class LLMController {
   public async forwardPostRequest(req: Request, res: Response, next: NextFunction) {
     if (
       req.method === 'POST' &&
-      (req.path.startsWith('v1/') || req.path.startsWith('/v1/')) &&
+      (req.path.startsWith('v1') || req.path.startsWith('/v1')) &&
       req.body != null &&
       req.body.model != null &&
       this.targetUrls.length > 0
     ) {
       const { model: modelId } = req.body
-      let targetUrl = this.targetUrls[0] // Default to first URL if no matching model found
+      const { base: firstBaseUrl, path: firstPath, apiKey: firstApiKey } = getPath(this.targetUrls[0])
+      let targetUrl = firstBaseUrl // Default to first URL if no matching model found
+      let targetPath = firstPath
+      let targetApiKey = firstApiKey
 
       const hash = md5(modelId)
       if (modelId && this.modelCache[hash]) {
-        targetUrl = this.modelCache[hash].url
+        const { path, base, apiKey } = getPath(this.modelCache[hash].url)
+        targetUrl = base
+        targetPath = path
+        targetApiKey = apiKey
       }
-      const fullUrl = new URL(req.path, targetUrl).toString()
+      const reqPath = req.path.startsWith('/v1/') ? req.path.replace('/v1', targetPath) : `${targetPath}${req.path}`
+      const fullUrl = new URL(reqPath, targetUrl).toString()
       log('info', `Forwarding request to: ${fullUrl} -> ${modelId}`)
-
+      const headers = { ...req.headers }
+      if (targetApiKey) {
+        headers['Authorization'] = `Bearer ${targetApiKey}`
+      }
       try {
         const axiosConfig: AxiosRequestConfig = {
           method: req.method,
           url: fullUrl,
-          headers: { ...req.headers },
+          headers,
           data: req.body,
           responseType: 'stream'
         }

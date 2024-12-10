@@ -2,7 +2,7 @@
 
 Manages Nginx for reverse proxy to multiple LLMs, with TLS & Bearer Auth tokens. Deployed with docker.
 
-- Aggregates multiple OpenAI-type LLM APIs (all routes must be prefixed with "/v1")
+- Aggregates multiple OpenAI-type LLM APIs
 - Supports cloudflare domains
 - Uses Let's Encrypt for TLS certificates
 - Uses certbot for certificate issuance and renewal
@@ -33,7 +33,7 @@ version: '3.6'
 
 services:
   llmp:
-    image: ghcr.io/j4ys0n/llm-proxy:1.5.0
+    image: ghcr.io/j4ys0n/llm-proxy:1.5.1
     container_name: llmp
     hostname: llmp
     restart: unless-stopped
@@ -51,7 +51,7 @@ services:
 Here's what your `.env` file should look like:
 ```bash
 PORT=8080 # node.js listen port. right now nginx is hard coded, so don't change this.
-TARGET_URLS=http://localhost:1234,http://192.168.1.100:1234|api-key-here # list of api endpoints (don't add /v1)
+TARGET_URLS=http://localhost:1234,http://192.168.1.100:1234|api-key-here # list of api endpoints (/v1 is optional)
 JWT_SECRET=randomly_generated_secret # secret for JWT token generation, change this!
 AUTH_USERNAME=admin
 AUTH_PASSWORD=secure_password # super basic auth credentials for the admin interface
