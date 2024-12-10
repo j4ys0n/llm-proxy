@@ -13,9 +13,19 @@ export interface ModelMap {
   [key: string]: { url: string; model: Model }
 }
 
+const defaultContentType = 'application/json'
+
 async function fetchModels(targetUrls: string[]): Promise<ModelMap> {
   const tmp: ModelMap = {}
-  for (const url of targetUrls) {
+  for (const urlAndToken of targetUrls) {
+    const [url, apiKey] = urlAndToken.split('|').map(s => s.trim())
+    const reqHeaders: { [key: string]: string } = {
+      accept: defaultContentType,
+      'Content-Type': defaultContentType
+    }
+    if (apiKey != null && apiKey !== '') {
+      reqHeaders['Authorization'] = `Bearer ${apiKey}`
+    }
     try {
       const response = await axios.get(`${url}/v1/models`)
       const models = response.data.data || []

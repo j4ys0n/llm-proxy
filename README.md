@@ -23,6 +23,7 @@ After this, you'll set up your files, start the container, hit a few routes and 
 #### **Don't forget to forward port 443 on your router!**
 
 I'll use `localhost`, `192.168.1.100` or `your.domain.com` as an examples, but fill these in with your domain or IP address.
+You can also add api keys if you need to. like `http://192.168.1.100:1234|api-key-here`.
 
 ### Files
 
@@ -32,7 +33,7 @@ version: '3.6'
 
 services:
   llmp:
-    image: ghcr.io/j4ys0n/llm-proxy:1.2.1
+    image: ghcr.io/j4ys0n/llm-proxy:1.5.0
     container_name: llmp
     hostname: llmp
     restart: unless-stopped
@@ -50,7 +51,7 @@ services:
 Here's what your `.env` file should look like:
 ```bash
 PORT=8080 # node.js listen port. right now nginx is hard coded, so don't change this.
-TARGET_URLS=http://localhost:1234,http://192.168.1.100:1234 # list of api endpoints (don't add /v1)
+TARGET_URLS=http://localhost:1234,http://192.168.1.100:1234|api-key-here # list of api endpoints (don't add /v1)
 JWT_SECRET=randomly_generated_secret # secret for JWT token generation, change this!
 AUTH_USERNAME=admin
 AUTH_PASSWORD=secure_password # super basic auth credentials for the admin interface
