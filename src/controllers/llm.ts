@@ -19,7 +19,7 @@ function getPath(url: string): { path: string, base: string, apiKey?: string } {
   try {
     const urlParts = url.split('|')
     const apiKey = urlParts.length > 1 ? urlParts[1] : undefined
-    const urlObject = new URL(url)
+    const urlObject = new URL(urlParts[0])
     return {
       path: urlObject.pathname || '/v1',
       base: urlObject.origin,
