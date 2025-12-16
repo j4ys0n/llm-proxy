@@ -4,7 +4,7 @@ import path from 'path'
 import { NginxController } from './controllers/nginx'
 import { LLMController } from './controllers/llm'
 import { ApiKeyController } from './controllers/apikeys'
-import { tokenMiddleware } from './utils/auth'
+import { tokenMiddleware, apiKeyMiddleware } from './utils/auth'
 import { AuthController } from './controllers/auth'
 import { log } from './utils/general'
 import bodyParser from 'body-parser'
@@ -48,7 +48,7 @@ const nginxController = new NginxController({ app, requestHandlers: [ tokenMiddl
 nginxController.registerRoutes()
 nginxController.start()
 
-const llmController = new LLMController({ app, requestHandlers: [tokenMiddleware ], targetUrls })
+const llmController = new LLMController({ app, requestHandlers: [apiKeyMiddleware], targetUrls })
 llmController.registerRoutes()
 
 // Start the server

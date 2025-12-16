@@ -1,9 +1,11 @@
 import { NextFunction, Request, Response, RequestHandler } from 'express'
 import jwt from 'jsonwebtoken'
 import { log } from './general'
+import { ApiKeyManager } from './apikeys'
 
 
 const jwtSecret = process.env.JWT_SECRET || 'your-jwt-secret'
+const apiKeyManager = new ApiKeyManager()
 
 
 export const tokenMiddleware: RequestHandler = (req: Request, res: Response, next: NextFunction) => {
@@ -24,5 +26,31 @@ export const tokenMiddleware: RequestHandler = (req: Request, res: Response, nex
   } else {
     log('warn', 'Authorization header missing or invalid')
     res.status(401).json({ error: 'Missing or invalid Authorization header' })
+  }
+}
+
+export const apiKeyMiddleware: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
+  const authHeader = req.headers.authorization
+
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const apiKey = authHeader.split(' ')[1]
+
+    try {
+      const validKey = await apiKeyManager.validateKey(apiKey)
+
+      if (validKey) {
+        ;(req as any).apiKey = validKey
+        next()
+      } else {
+        log('warn', `Invalid API key attempted: ${apiKey.substring(0, 10)}...`)
+        res.status(401).json({ error: 'Invalid API key' })
+      }
+    } catch (error) {
+      log('error', `API key validation error: ${(error as any).toString()}`)
+      res.status(500).json({ error: 'Internal server error' })
+    }
+  } else {
+    log('warn', 'API key missing in Authorization header')
+    res.status(401).json({ error: 'Missing API key' })
   }
 }

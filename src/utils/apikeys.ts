@@ -14,6 +14,7 @@ export class ApiKeyManager {
   private filePath: string
   private lockFile: string
   private isInitialized: boolean = false
+  private keysCache: Map<string, ApiKey> = new Map()
 
   constructor(filePath: string = './data/apikeys.json') {
     this.filePath = path.resolve(filePath)
@@ -32,10 +33,36 @@ export class ApiKeyManager {
         log('info', `Created API keys file at ${this.filePath}`)
       }
 
+      // Load keys into memory
+      const data = await this.loadFromDisk()
+      this.keysCache.clear()
+      for (const key of data.keys) {
+        this.keysCache.set(key.key, key)
+      }
+
       this.isInitialized = true
+      log('info', `Loaded ${this.keysCache.size} API keys into memory`)
     } catch (error) {
       log('error', 'Failed to initialize API key storage', error)
       throw error
+    }
+  }
+
+  private async loadFromDisk(): Promise<{ keys: ApiKey[] }> {
+    try {
+      await this.acquireLock()
+      const data = await fs.readJson(this.filePath)
+      await this.releaseLock()
+
+      if (!data.keys || !Array.isArray(data.keys)) {
+        return { keys: [] }
+      }
+
+      return data
+    } catch (error) {
+      await this.releaseLock()
+      log('error', 'Failed to read API keys file', error)
+      return { keys: [] }
     }
   }
 
@@ -61,26 +88,6 @@ export class ApiKeyManager {
     }
   }
 
-  private async safeRead(): Promise<{ keys: ApiKey[] }> {
-    await this.initialize()
-
-    try {
-      await this.acquireLock()
-      const data = await fs.readJson(this.filePath)
-      await this.releaseLock()
-
-      if (!data.keys || !Array.isArray(data.keys)) {
-        return { keys: [] }
-      }
-
-      return data
-    } catch (error) {
-      await this.releaseLock()
-      log('error', 'Failed to read API keys file', error)
-      return { keys: [] }
-    }
-  }
-
   private async safeWrite(data: { keys: ApiKey[] }): Promise<boolean> {
     await this.initialize()
 
@@ -97,32 +104,42 @@ export class ApiKeyManager {
   }
 
   public async listKeys(): Promise<ApiKey[]> {
-    const data = await this.safeRead()
-    return data.keys
+    await this.initialize()
+    return Array.from(this.keysCache.values())
   }
 
   public async getKeyByUsername(username: string): Promise<ApiKey | null> {
-    const data = await this.safeRead()
-    const key = data.keys.find(k => k.username === username)
-    return key || null
+    await this.initialize()
+    for (const key of this.keysCache.values()) {
+      if (key.username === username) {
+        return key
+      }
+    }
+    return null
   }
 
   public async getKeyById(id: string): Promise<ApiKey | null> {
-    const data = await this.safeRead()
-    const key = data.keys.find(k => k.id === id)
-    return key || null
+    await this.initialize()
+    for (const key of this.keysCache.values()) {
+      if (key.id === id) {
+        return key
+      }
+    }
+    return null
   }
 
   public async createKey(username: string): Promise<{ success: boolean; message: string; key?: ApiKey }> {
+    await this.initialize()
+
     if (!username || username.trim().length === 0) {
       return { success: false, message: 'Username is required' }
     }
 
-    const data = await this.safeRead()
-
-    const existing = data.keys.find(k => k.username === username)
-    if (existing) {
-      return { success: false, message: 'API key already exists for this username' }
+    // Check cache for existing username
+    for (const key of this.keysCache.values()) {
+      if (key.username === username.trim()) {
+        return { success: false, message: 'API key already exists for this username' }
+      }
     }
 
     const newKey: ApiKey = {
@@ -132,10 +149,14 @@ export class ApiKeyManager {
       createdAt: new Date().toISOString()
     }
 
-    data.keys.push(newKey)
-    const writeSuccess = await this.safeWrite(data)
+    // Write to disk
+    const allKeys = Array.from(this.keysCache.values())
+    allKeys.push(newKey)
+    const writeSuccess = await this.safeWrite({ keys: allKeys })
 
     if (writeSuccess) {
+      // Update cache
+      this.keysCache.set(newKey.key, newKey)
       log('info', `Created API key for user: ${username}`)
       return { success: true, message: 'API key created successfully', key: newKey }
     } else {
@@ -144,20 +165,29 @@ export class ApiKeyManager {
   }
 
   public async deleteKey(id: string): Promise<{ success: boolean; message: string }> {
-    const data = await this.safeRead()
+    await this.initialize()
 
-    const index = data.keys.findIndex(k => k.id === id)
-    if (index === -1) {
+    // Find key in cache
+    let keyToDelete: ApiKey | null = null
+    for (const key of this.keysCache.values()) {
+      if (key.id === id) {
+        keyToDelete = key
+        break
+      }
+    }
+
+    if (!keyToDelete) {
       return { success: false, message: 'API key not found' }
     }
 
-    const deletedKey = data.keys[index]
-    data.keys.splice(index, 1)
-
-    const writeSuccess = await this.safeWrite(data)
+    // Remove from cache and write to disk
+    const allKeys = Array.from(this.keysCache.values()).filter(k => k.id !== id)
+    const writeSuccess = await this.safeWrite({ keys: allKeys })
 
     if (writeSuccess) {
-      log('info', `Deleted API key for user: ${deletedKey.username}`)
+      // Update cache
+      this.keysCache.delete(keyToDelete.key)
+      log('info', `Deleted API key for user: ${keyToDelete.username}`)
       return { success: true, message: 'API key deleted successfully' }
     } else {
       return { success: false, message: 'Failed to delete API key' }
@@ -165,8 +195,7 @@ export class ApiKeyManager {
   }
 
   public async validateKey(key: string): Promise<ApiKey | null> {
-    const data = await this.safeRead()
-    const apiKey = data.keys.find(k => k.key === key)
-    return apiKey || null
+    await this.initialize()
+    return this.keysCache.get(key) || null
   }
 }
