@@ -19,8 +19,16 @@ WORKDIR /app
 # Bundle app source
 COPY . .
 
-# Install dependencies & build
-RUN yarn && yarn build
+# Install backend dependencies
+RUN yarn install
+
+# Install frontend dependencies and build frontend
+WORKDIR /app/frontend
+RUN yarn install && yarn build
+
+# Build backend
+WORKDIR /app
+RUN yarn build
 
 # Expose port 8080 & 443
 EXPOSE 8080 443
