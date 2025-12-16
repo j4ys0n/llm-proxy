@@ -4,6 +4,7 @@ import path from 'path'
 import { NginxController } from './controllers/nginx'
 import { LLMController } from './controllers/llm'
 import { ApiKeyController } from './controllers/apikeys'
+import { AnalyticsController } from './controllers/analytics'
 import { tokenMiddleware, apiKeyMiddleware } from './utils/auth'
 import { AuthController } from './controllers/auth'
 import { log } from './utils/general'
@@ -43,6 +44,9 @@ authController.registerRoutes()
 
 const apiKeyController = new ApiKeyController({ app, requestHandlers: [ tokenMiddleware ] })
 apiKeyController.registerRoutes()
+
+const analyticsController = new AnalyticsController({ app, requestHandlers: [ tokenMiddleware ] })
+analyticsController.registerRoutes()
 
 const nginxController = new NginxController({ app, requestHandlers: [ tokenMiddleware ] })
 nginxController.registerRoutes()

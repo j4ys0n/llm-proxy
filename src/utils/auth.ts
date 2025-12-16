@@ -2,10 +2,12 @@ import { NextFunction, Request, Response, RequestHandler } from 'express'
 import jwt from 'jsonwebtoken'
 import { log } from './general'
 import { ApiKeyManager } from './apikeys'
+import { RequestTracker } from './requestTracker'
 
 
 const jwtSecret = process.env.JWT_SECRET || 'your-jwt-secret'
 const apiKeyManager = new ApiKeyManager()
+const requestTracker = new RequestTracker()
 
 
 export const tokenMiddleware: RequestHandler = (req: Request, res: Response, next: NextFunction) => {
@@ -40,6 +42,38 @@ export const apiKeyMiddleware: RequestHandler = async (req: Request, res: Respon
 
       if (validKey) {
         ;(req as any).apiKey = validKey
+
+        // Track request start time
+        const startTime = Date.now()
+
+        // Track response completion
+        const originalEnd = res.end.bind(res)
+        let responseSent = false
+
+        res.end = function(...args: any[]): any {
+          if (!responseSent) {
+            responseSent = true
+            const endTime = Date.now()
+
+            // Track successful completion
+            requestTracker.trackRequest(apiKey, startTime, endTime).catch(err => {
+              log('error', 'Failed to track request', err)
+            })
+          }
+          return originalEnd(...args)
+        } as any
+
+        // Track errors
+        res.on('error', () => {
+          if (!responseSent) {
+            responseSent = true
+            // Track failed request
+            requestTracker.trackRequest(apiKey, startTime, null).catch(err => {
+              log('error', 'Failed to track failed request', err)
+            })
+          }
+        })
+
         next()
       } else {
         log('warn', `Invalid API key attempted: ${apiKey.substring(0, 10)}...`)
