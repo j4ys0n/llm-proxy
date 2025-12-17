@@ -2,38 +2,49 @@
 
 Manages Nginx for reverse proxy to multiple LLMs, with TLS & Bearer Auth tokens. Deployed with docker.
 
-- Aggregates multiple OpenAI-type LLM APIs
-- Supports cloudflare domains
-- Uses Let's Encrypt for TLS certificates
-- Uses certbot for certificate issuance and renewal
-- Uses Nginx as a public-domain reverse proxy to add TLS
-- Uses JWT for bearer authentication
-- Auth & nginx enpoints are IP restricted.
+## Features
+
+- **LLM API Aggregation**: Aggregates multiple OpenAI-type LLM APIs into a single endpoint
+- **API Key Management**: Web-based UI for creating and managing API keys with user associations
+- **Request Analytics**: Track and analyze API usage per key with CSV-based storage
+- **TLS/SSL Support**: Automatic Let's Encrypt certificates via certbot with Cloudflare DNS validation
+- **Nginx Reverse Proxy**: Production-grade reverse proxy with IP restriction
+- **Secure Authentication**: HttpOnly cookie-based JWT authentication for web UI, Bearer tokens for API
+- **Input Validation**: Comprehensive request validation using Joi
+- **CORS Configuration**: Configurable cross-origin resource sharing with credential support
+- **Request Tracking**: Per-API-key request analytics with success/failure tracking
 
 ***All requests to `/v1/*` are proxied to the LLM APIs except for `/v1/models`***
 
-`/v1/models` is a special endpoint that returns the list of models available from all LLM APIs.
+`/v1/models` is a special endpoint that returns the aggregated list of models available from all configured LLM APIs.
 
-## How to use
+## Quick Start
 
-Docker compose is going to be the easiest way to get up and running, but you could also manually run the docker image. Before you do anything else, if you don't have a cloudflare account, sign up now - it's free. You will need to create an API Token with the "Zone", "DNS", "Edit" permissions. This will be used when issuing your certs to verify that you own the domain you want to use for TLS. After you have your key, set up a new DNS record to point to your IP address. This can be proxied on the cloudflare end.
+### Prerequisites
 
-After this, you'll set up your files, start the container, hit a few routes and you'll be good to go!
+1. **Cloudflare Account** (free): Create an API Token with "Zone", "DNS", "Edit" permissions
+2. **DNS Setup**: Point your domain to your server's IP address
+3. **Port Forwarding**: Forward port 443 on your router
 
-#### **Don't forget to forward port 443 on your router!**
+### Installation
 
-I'll use `localhost`, `192.168.1.100` or `your.domain.com` as an examples, but fill these in with your domain or IP address.
-You can also add api keys if you need to. like `http://192.168.1.100:1234|api-key-here`.
+1. Create required files (see below)
+2. Start with docker-compose: `docker-compose up -d`
+3. Access web UI at `http://your-server-ip:8080/admin`
+4. Configure certificates and nginx (see Routes section)
 
-### Files
+## Configuration
 
-Here's what you'll need in your docker-compose file:
+### Docker Compose
+
+Create `docker-compose.yml`:
+
 ```yaml
 version: '3.6'
 
 services:
   llmp:
-    image: ghcr.io/j4ys0n/llm-proxy:1.5.4
+    image: ghcr.io/j4ys0n/llm-proxy:latest
     container_name: llmp
     hostname: llmp
     restart: unless-stopped
@@ -41,106 +52,491 @@ services:
       - 8080:8080
       - 443:443
     volumes:
-      - .env:/app/.env # environment variables
-      - ./data:/app/data # any data that the app needs to persist
-      - ./cloudflare_credentials:/opt/cloudflare/credentials # cloudflare api token
-      - ./nginx:/etc/nginx/conf.d # nginx configs
-      - ./certs:/etc/letsencrypt # tsl certificates
+      - .env:/app/.env
+      - ./data:/app/data
+      - ./cloudflare_credentials:/opt/cloudflare/credentials
+      - ./nginx:/etc/nginx/conf.d
+      - ./certs:/etc/letsencrypt
 ```
 
-Here's what your `.env` file should look like:
+### Environment Variables
+
+Create `.env`:
+
 ```bash
-PORT=8080 # node.js listen port. right now nginx is hard coded, so don't change this.
-TARGET_URLS=http://localhost:1234,http://192.168.1.100:1234|api-key-here # list of api endpoints (/v1 is optional)
-JWT_SECRET=randomly_generated_secret # secret for JWT token generation, change this!
-AUTH_USERNAME=admin
-AUTH_PASSWORD=secure_password # super basic auth credentials for the admin interface
+# Server Configuration
+PORT=8080                                    # Node.js listen port (don't change if using default nginx config)
+PAYLOAD_LIMIT=1mb                            # Maximum request payload size
+
+# LLM API Endpoints
+TARGET_URLS=http://localhost:1234,http://192.168.1.100:1234|api-key-here
+# Format: url1,url2|api-key,url3
+# /v1 path is optional and will be added automatically
+# API keys are optional, separated by |
+
+# Authentication
+JWT_SECRET=randomly_generated_secret_change_this  # REQUIRED: Use a strong, random secret
+AUTH_USERNAME=admin                               # Web UI admin username
+AUTH_PASSWORD=secure_password_change_this         # Web UI admin password
+
+# CORS (Optional)
+CORS_ORIGIN=true                            # Set to specific origin in production (e.g., https://yourdomain.com)
+
+# Environment
+NODE_ENV=production                         # Set to 'production' for HTTPS-only cookies
 ```
 
-Here's what your cloudflare_credendials file should look like
+### Cloudflare Credentials
+
+Create `cloudflare_credentials`:
+
 ```bash
 dns_cloudflare_api_token = your_token_here
 ```
 
-### Routes
+## Security Practices
 
-You'll need to use the local, unsecured endpoints to get set up initially. The `/auth/token` endpoint is the only endpoint that does't need an Authorization header and token.
+### Secret Management
 
-Generate tokens.
+**CRITICAL**: The following secrets must be changed from defaults:
 
-`POST http://192.168.1.100:8080/auth/token`
+- `JWT_SECRET`: Use a cryptographically strong random string (minimum 32 characters)
+  - Generate with: `openssl rand -base64 32`
+  - Rotate periodically (requires re-authentication of all users)
+- `AUTH_PASSWORD`: Use a strong password (minimum 12 characters, mixed case, numbers, symbols)
+
+**Best Practices**:
+- Never commit `.env` files to version control
+- In production, use a secrets management service (HashiCorp Vault, AWS Secrets Manager, etc.)
+- Restrict file permissions: `chmod 600 .env cloudflare_credentials`
+- Use different secrets for development and production
+- Rotate API keys regularly
+- Monitor failed authentication attempts
+
+### Cookie Security
+
+The application uses HttpOnly cookies for web UI authentication:
+- `httpOnly: true` - Prevents JavaScript access (XSS protection)
+- `secure: true` (production) - HTTPS-only transmission
+- `sameSite: 'strict'` - CSRF protection
+- 24-hour expiration
+
+### API Key Security
+
+- API keys are 64-character hex strings (cryptographically random)
+- Stored with username associations for audit trails
+- Can be revoked instantly (in-memory validation)
+- All API requests tracked per key
+
+### Network Security
+
+- Admin routes (`/auth`, `/nginx`, `/api/keys`, `/api/analytics`) are IP-restricted via nginx
+- CIDR group configuration allows granular access control
+- CORS configured with credential support
+- Input validation on all endpoints
+
+## Web Interface
+
+Access the management UI at:
+- `http://your-server-ip:8080/admin` (before TLS setup)
+- `https://your.domain.com/admin` (after TLS setup)
+
+### Features
+
+1. **Login**: HttpOnly cookie-based authentication
+2. **API Key Management**:
+   - Create keys with username association
+   - View all keys with creation dates
+   - Copy keys to clipboard
+   - Delete/revoke keys
+3. **Analytics Dashboard**:
+   - View request statistics per API key
+   - Last week of data displayed by default
+   - Custom date range filtering
+   - Success/failure indicators
+   - Elapsed time per request
+
+## API Endpoints
+
+### Authentication
+
+#### POST `/auth/login`
+Cookie-based login for web UI (recommended).
+
+**Request**:
 ```json
 {
-    "username": "admin",
-    "password": "secure_password"
+  "username": "admin",
+  "password": "secure_password"
 }
 ```
-response:
+
+**Response**:
 ```json
 {
-    "token": "generated_token_here"
+  "success": true,
+  "username": "admin"
 }
 ```
 
-#### All of the routes below need a bearer token in the Authorization header.
-`Authorization: Bearer generated_token_here`
+Sets `auth_token` HttpOnly cookie.
 
-Get TLS certificates.
+#### POST `/auth/logout`
+Clears authentication cookie.
 
-`POST http://192.168.1.100:8080/nginx/certificates/obtain`
+**Response**:
 ```json
 {
-    "domains": ["your.domain.com"]
+  "success": true
 }
 ```
-response:
+
+#### POST `/auth/token` (Legacy)
+Returns JWT token in JSON (for API clients).
+
+**Request**:
 ```json
 {
-    "success": true,
-    "message": "Certificates obtained successfully."
+  "username": "admin",
+  "password": "secure_password"
 }
 ```
 
-Write default config with your domain. (this should be sufficient for you, fill in your domain and cider groups)
-
-Note: you can add multiple CIDR groups if you have multiple internal IP ranges you want admin functions to be accessible to. This is all of the routes that start with `/auth` or `/nginx`.
-
-Hint: `192.168.1.0/24` will allow all IPs from `192.168.1.1` - `192.168.1.254`. `192.168.1.111/32` will only allow `192.168.1.111`.
-
-`POST http://192.168.1.100:8080/nginx/config/write-default`
+**Response**:
 ```json
 {
-    "domain": "your.domain.com",
-    "cidrGroups": ["192.168.1.0/24"]
+  "token": "jwt_token_here"
 }
 ```
-response:
+
+### API Key Management
+
+*All endpoints require authentication (cookie or Bearer token).*
+
+#### GET `/api/keys`
+List all API keys.
+
+**Response**:
 ```json
 {
-    "success": true,
-    "message": "Default config written successfully"
+  "success": true,
+  "keys": [
+    {
+      "id": "unique_id",
+      "key": "64_char_hex_string",
+      "username": "user1",
+      "createdAt": "2025-12-17T00:00:00.000Z"
+    }
+  ]
 }
 ```
 
-Reload nginx to apply changes.
-`GET http://192.168.1.100:8080/nginx/reload`
-response:
+#### POST `/api/keys`
+Create a new API key.
+
+**Request**:
 ```json
 {
-    "success": true,
-    "message": "Nginx configuration reloaded successfully."
+  "username": "user1"
 }
 ```
 
-***If you made it here, you should be good to go!***
+**Validation**:
+- Username: 3-50 characters, alphanumeric only
 
-Other available endpoints (these will be documented better in the future)
+**Response**:
+```json
+{
+  "success": true,
+  "key": {
+    "id": "unique_id",
+    "key": "64_char_hex_string",
+    "username": "user1",
+    "createdAt": "2025-12-17T00:00:00.000Z"
+  }
+}
+```
 
-`GET /nginx/config/get` - get current nginx config as a string.
+#### DELETE `/api/keys/:id`
+Delete an API key (instant revocation).
 
-`POST /nginx/config/update` - update the nginx config with a custom domain.
-Body: `{ "config": string }`
+**Response**:
+```json
+{
+  "success": true,
+  "message": "API key deleted successfully"
+}
+```
 
-`GET /nginx/config/get-default` - get default nginx config template.
+### Analytics
 
-`GET /nginx/certificates/renew` - renew certificates for your domains.
+#### GET `/api/analytics/:keyId?startDate=X&endDate=Y`
+Get request analytics for an API key.
+
+**Parameters**:
+- `keyId`: API key (64-char hex string)
+- `startDate`: (Optional) Start timestamp in epoch milliseconds
+- `endDate`: (Optional) End timestamp in epoch milliseconds
+
+**Response**:
+```json
+{
+  "success": true,
+  "records": [
+    {
+      "startTime": 1734400000000,
+      "endTime": 1734400001234
+    },
+    {
+      "startTime": 1734400002000,
+      "endTime": null
+    }
+  ]
+}
+```
+
+**Notes**:
+- Without date range, returns last 7 days
+- `endTime: null` indicates failed request
+- Timestamps in epoch milliseconds
+
+### Nginx Management
+
+*All endpoints require authentication via Bearer token.*
+
+#### POST `/nginx/certificates/obtain`
+Obtain Let's Encrypt certificates.
+
+**Request**:
+```json
+{
+  "domains": ["your.domain.com"]
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "Certificates obtained successfully."
+}
+```
+
+#### GET `/nginx/certificates/renew`
+Renew all certificates.
+
+#### POST `/nginx/config/write-default`
+Write default nginx config with IP restrictions.
+
+**Request**:
+```json
+{
+  "domain": "your.domain.com",
+  "cidrGroups": ["192.168.1.0/24"]
+}
+```
+
+**CIDR Examples**:
+- `192.168.1.0/24` - Allows 192.168.1.1 through 192.168.1.254
+- `192.168.1.111/32` - Only allows 192.168.1.111
+- Multiple groups supported for complex networks
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "Default config written successfully"
+}
+```
+
+#### GET `/nginx/reload`
+Reload nginx configuration.
+
+#### GET `/nginx/config/get`
+Get current nginx config as string.
+
+#### POST `/nginx/config/update`
+Update nginx config with custom configuration.
+
+**Request**:
+```json
+{
+  "config": "nginx_config_string_here"
+}
+```
+
+#### GET `/nginx/config/get-default`
+Get default nginx config template.
+
+### LLM Proxy Endpoints
+
+#### GET `/v1/models`
+Aggregated model list from all configured LLM APIs.
+
+*Requires API key in Authorization header.*
+
+**Headers**:
+```
+Authorization: Bearer your_api_key_here
+```
+
+**Response**:
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "model-name",
+      "object": "model",
+      "created": 1234567890,
+      "owned_by": "organization"
+    }
+  ]
+}
+```
+
+#### POST `/v1/*`
+All other `/v1/*` requests are proxied to configured LLM APIs.
+
+*Requires API key in Authorization header.*
+
+**Request Routing**:
+1. Extracts model from request body
+2. Hashes model ID to select upstream API
+3. Forwards request with streaming support
+4. Tracks start/end time and success/failure
+
+## Setup Flow
+
+1. Start container with `docker-compose up -d`
+2. Access web UI: `http://your-server-ip:8080/admin`
+3. Login with `AUTH_USERNAME` and `AUTH_PASSWORD`
+4. Use API to obtain certificates:
+   ```bash
+   curl -X POST http://192.168.1.100:8080/nginx/certificates/obtain \
+     -H "Authorization: Bearer $(curl -X POST http://192.168.1.100:8080/auth/token \
+       -H "Content-Type: application/json" \
+       -d '{"username":"admin","password":"secure_password"}' | jq -r '.token')" \
+     -H "Content-Type: application/json" \
+     -d '{"domains":["your.domain.com"]}'
+   ```
+5. Write default config:
+   ```bash
+   curl -X POST http://192.168.1.100:8080/nginx/config/write-default \
+     -H "Authorization: Bearer YOUR_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"domain":"your.domain.com","cidrGroups":["192.168.1.0/24"]}'
+   ```
+6. Reload nginx:
+   ```bash
+   curl http://192.168.1.100:8080/nginx/reload \
+     -H "Authorization: Bearer YOUR_TOKEN"
+   ```
+7. Access at `https://your.domain.com/admin`
+
+## Development
+
+### Prerequisites
+- Node.js 18+
+- Yarn
+
+### Commands
+
+```bash
+# Install dependencies
+yarn install
+
+# Run tests
+yarn test
+
+# Development mode (auto-reload)
+yarn dev
+
+# Build
+yarn build
+
+# Start production build
+yarn start
+```
+
+### Testing
+
+Tests use Jest with ts-jest:
+- Unit tests for utilities (`src/utils/__tests__`)
+- Controller tests (`src/controllers/__tests__`)
+- Run with `yarn test`
+
+### Project Structure
+
+```
+llm-proxy/
+├── src/
+│   ├── controllers/      # Route controllers
+│   │   ├── analytics.ts  # Analytics endpoints
+│   │   ├── apikeys.ts    # API key management
+│   │   ├── auth.ts       # Authentication
+│   │   ├── llm.ts        # LLM proxy logic
+│   │   └── nginx.ts      # Nginx management
+│   ├── utils/           # Utilities
+│   │   ├── apikeys.ts   # API key manager
+│   │   ├── auth.ts      # Auth middleware
+│   │   ├── general.ts   # Logging
+│   │   ├── nginx.ts     # Nginx manager
+│   │   ├── requestTracker.ts  # Analytics tracker
+│   │   └── validation.ts      # Input validation
+│   ├── static/          # Static assets
+│   └── index.ts         # App entry point
+├── frontend/            # Vue 3 UI
+│   └── src/
+│       └── App.vue      # Main component
+└── Dockerfile           # Multi-stage build
+
+## Troubleshooting
+
+### Authentication Issues
+- Ensure `JWT_SECRET` is set and consistent
+- Check cookie settings (secure flag requires HTTPS)
+- Verify CORS origin matches your domain
+
+### Certificate Issues
+- Verify Cloudflare API token has DNS edit permissions
+- Check domain DNS points to correct IP
+- Ensure port 443 is forwarded
+
+### API Key Issues
+- Keys are validated in-memory (restart clears validation cache)
+- Deleted keys are immediately invalid
+- Check Authorization header format: `Bearer <key>`
+
+### Analytics Not Recording
+- Verify API key is valid
+- Check file permissions on data directory
+- Review logs for tracking errors
+
+## License
+
+Apache-2.0
+
+## Version
+
+Current version: 1.6.1
+
+### Changelog
+
+**v1.6.1**:
+- Security improvements: HttpOnly cookie auth, input validation
+- Fixed clipboard implementation
+- Added CORS configuration
+- Comprehensive test coverage
+- Documentation updates
+
+**v1.6.0**:
+- API key management with Vue 3 frontend
+- Request analytics and tracking
+- In-memory API key caching
+- Per-key request history with CSV storage
+
+**v1.5.x**:
+- Initial release with JWT auth
+- Nginx management
+- LLM API aggregation

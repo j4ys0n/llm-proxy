@@ -1,13 +1,13 @@
 {
   "name": "llm-proxy",
-  "version": "1.5.4",
+  "version": "1.6.1",
   "description": "Manages Nginx for reverse proxy to multiple LLMs, with TLS & Bearer Auth tokens",
   "main": "dist/index.js",
   "scripts": {
     "start": "node dist/index.js",
-    "build": "rm -rf dist && tsc && cp -r src/static dist/",
+    "build": "rm -rf dist && tsc && cp -r src/static dist/ && cp -r frontend/dist/* dist/static/",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest"
   },
   "keywords": [
     "node",
@@ -25,16 +25,24 @@
   "license": "Apache-2.0",
   "dependencies": {
     "axios": "^1.7.2",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
     "dotenv": "^10.0.0",
     "express": "^4.19.2",
     "fs-extra": "^11.2.0",
+    "joi": "17.13.3",
     "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
     "@types/express": "^4.17.21",
     "@types/fs-extra": "^11.0.4",
+    "@types/jest": "^29.5.0",
     "@types/jsonwebtoken": "^9.0.2",
     "@types/node": "^20.12.7",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.4.5"
   }
