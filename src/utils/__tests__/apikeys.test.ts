@@ -17,7 +17,6 @@ describe('ApiKeyManager', () => {
     try {
       await fs.remove(testFilePath)
       await fs.remove(`${testFilePath}.lock`)
-      await fs.remove(path.dirname(testFilePath))
     } catch (error) {
       // Ignore cleanup errors
     }
