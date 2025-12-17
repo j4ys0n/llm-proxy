@@ -160,7 +160,6 @@ import { ref, onMounted, computed } from 'vue'
 
 // Authentication state
 const isAuthenticated = ref(false)
-const token = ref('')
 const username = ref('')
 const loginUsername = ref('')
 const loginPassword = ref('')
@@ -204,21 +203,15 @@ const apiCall = async (url, options = {}) => {
     ...options.headers
   }
 
-  if (isAuthenticated.value && token.value) {
-    headers['Authorization'] = `Bearer ${token.value}`
-  }
-
   const response = await fetch(url, {
     ...options,
-    headers
+    headers,
+    credentials: 'include' // Include cookies in requests
   })
 
   if (response.status === 401) {
     isAuthenticated.value = false
-    token.value = ''
     username.value = ''
-    localStorage.removeItem('token')
-    localStorage.removeItem('username')
     throw new Error('Unauthorized - please login again')
   }
 
@@ -231,9 +224,10 @@ const login = async () => {
   isLoading.value = true
 
   try {
-    const response = await fetch('/auth/token', {
+    const response = await fetch('/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', // Include cookies
       body: JSON.stringify({
         username: loginUsername.value,
         password: loginPassword.value
@@ -242,12 +236,9 @@ const login = async () => {
 
     const data = await response.json()
 
-    if (response.ok && data.token) {
-      token.value = data.token
-      username.value = loginUsername.value
+    if (response.ok && data.success) {
+      username.value = data.username
       isAuthenticated.value = true
-      localStorage.setItem('token', data.token)
-      localStorage.setItem('username', loginUsername.value)
       loginPassword.value = ''
       await loadKeys()
     } else {
@@ -260,15 +251,21 @@ const login = async () => {
   }
 }
 
-const logout = () => {
+const logout = async () => {
+  try {
+    await fetch('/auth/logout', {
+      method: 'POST',
+      credentials: 'include'
+    })
+  } catch (error) {
+    console.error('Logout error:', error)
+  }
+
   isAuthenticated.value = false
-  token.value = ''
   username.value = ''
   keys.value = []
   analyticsRecords.value = []
   selectedKeyId.value = ''
-  localStorage.removeItem('token')
-  localStorage.removeItem('username')
   activeTab.value = 'keys'
 }
 
@@ -390,13 +387,10 @@ const copyToClipboard = async (text) => {
     await navigator.clipboard.writeText(text)
     alert('API key copied to clipboard!')
   } catch (error) {
-    const textArea = document.createElement('textarea')
-    textArea.value = text
-    document.body.appendChild(textArea)
-    textArea.select()
-    document.execCommand('copy')
-    document.body.removeChild(textArea)
-    alert('API key copied to clipboard!')
+    // Fallback: navigator.clipboard requires HTTPS in most browsers
+    // Log error and show helpful message
+    console.error('Clipboard copy failed:', error)
+    alert(`Failed to copy. Please copy manually: ${text}`)
   }
 }
 
@@ -424,15 +418,25 @@ const calculateElapsed = (record) => {
 }
 
 // Lifecycle
-onMounted(() => {
-  const savedToken = localStorage.getItem('token')
-  const savedUsername = localStorage.getItem('username')
+onMounted(async () => {
+  // Try to load keys to check if user is authenticated via cookie
+  try {
+    const response = await fetch('/api/keys', {
+      credentials: 'include'
+    })
 
-  if (savedToken && savedUsername) {
-    token.value = savedToken
-    username.value = savedUsername
-    isAuthenticated.value = true
-    loadKeys()
+    if (response.ok) {
+      const data = await response.json()
+      if (data.success) {
+        isAuthenticated.value = true
+        keys.value = data.keys
+        // Note: username is not available without additional API call
+        // Could add /api/me endpoint if needed
+      }
+    }
+  } catch (error) {
+    // Not authenticated, show login form
+    console.log('Not authenticated on mount')
   }
 })
 </script>

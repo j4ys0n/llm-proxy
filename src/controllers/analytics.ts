@@ -1,6 +1,8 @@
 import { Express, Request, Response, RequestHandler } from 'express'
 import { RequestTracker } from '../utils/requestTracker'
 import { log } from '../utils/general'
+import { validate, apiKeySchema, timestampSchema } from '../utils/validation'
+import Joi from 'joi'
 
 export class AnalyticsController {
   private app: Express
@@ -19,11 +21,39 @@ export class AnalyticsController {
   }
 
   private async getAnalytics(req: Request, res: Response): Promise<void> {
-    const { keyId } = req.params
-    const { startDate, endDate } = req.query
+    // Validate keyId
+    const keyValidation = validate<string>(apiKeySchema, req.params.keyId)
+    if (keyValidation.error || !keyValidation.value) {
+      res.status(400).json({ success: false, message: keyValidation.error || 'Invalid key ID' })
+      return
+    }
+    const validKeyId = keyValidation.value
 
-    if (!keyId) {
-      res.status(400).json({ success: false, message: 'Key ID is required' })
+    // Validate date parameters if provided
+    let startDate: number | undefined
+    let endDate: number | undefined
+
+    if (req.query.startDate) {
+      const startValidation = validate<number>(timestampSchema, parseInt(req.query.startDate as string, 10))
+      if (startValidation.error || !startValidation.value) {
+        res.status(400).json({ success: false, message: `Invalid start date: ${startValidation.error}` })
+        return
+      }
+      startDate = startValidation.value
+    }
+
+    if (req.query.endDate) {
+      const endValidation = validate<number>(timestampSchema, parseInt(req.query.endDate as string, 10))
+      if (endValidation.error || !endValidation.value) {
+        res.status(400).json({ success: false, message: `Invalid end date: ${endValidation.error}` })
+        return
+      }
+      endDate = endValidation.value
+    }
+
+    // Validate date range if both provided
+    if (startDate && endDate && startDate >= endDate) {
+      res.status(400).json({ success: false, message: 'Start date must be before end date' })
       return
     }
 
@@ -31,12 +61,10 @@ export class AnalyticsController {
       let records
 
       if (startDate && endDate) {
-        const start = parseInt(startDate as string, 10)
-        const end = parseInt(endDate as string, 10)
-        records = await this.requestTracker.getRecords(keyId, start, end)
+        records = await this.requestTracker.getRecords(validKeyId, startDate, endDate)
       } else {
         // Default to last week
-        records = await this.requestTracker.getLastWeekRecords(keyId)
+        records = await this.requestTracker.getLastWeekRecords(validKeyId)
       }
 
       res.json({ success: true, records })

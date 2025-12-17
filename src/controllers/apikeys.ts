@@ -1,6 +1,7 @@
 import { Express, Request, Response, RequestHandler } from 'express'
 import { ApiKeyManager } from '../utils/apikeys'
 import { log } from '../utils/general'
+import { validate, createApiKeySchema, apiKeySchema } from '../utils/validation'
 
 export class ApiKeyController {
   private app: Express
@@ -32,15 +33,15 @@ export class ApiKeyController {
   }
 
   private async createKey(req: Request, res: Response): Promise<void> {
-    const { username } = req.body
+    const validation = validate<{ username: string }>(createApiKeySchema, req.body)
 
-    if (!username) {
-      res.status(400).json({ success: false, message: 'Username is required' })
+    if (validation.error || !validation.value) {
+      res.status(400).json({ success: false, message: validation.error || 'Validation failed' })
       return
     }
 
     try {
-      const result = await this.apiKeyManager.createKey(username)
+      const result = await this.apiKeyManager.createKey(validation.value.username)
       const status = result.success ? 200 : 400
       res.status(status).json(result)
     } catch (error) {
@@ -68,15 +69,15 @@ export class ApiKeyController {
   }
 
   private async validateKey(req: Request, res: Response): Promise<void> {
-    const { key } = req.params
+    const validation = validate<string>(apiKeySchema, req.params.key)
 
-    if (!key) {
-      res.status(400).json({ success: false, message: 'API key is required' })
+    if (validation.error || !validation.value) {
+      res.status(400).json({ success: false, message: validation.error || 'Validation failed' })
       return
     }
 
     try {
-      const apiKey = await this.apiKeyManager.validateKey(key)
+      const apiKey = await this.apiKeyManager.validateKey(validation.value)
       if (apiKey) {
         res.json({ success: true, valid: true, username: apiKey.username })
       } else {

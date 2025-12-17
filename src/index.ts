@@ -1,6 +1,8 @@
 import dotenv from 'dotenv'
 import express from 'express'
 import path from 'path'
+import cookieParser from 'cookie-parser'
+import cors from 'cors'
 import { NginxController } from './controllers/nginx'
 import { LLMController } from './controllers/llm'
 import { ApiKeyController } from './controllers/apikeys'
@@ -16,10 +18,21 @@ const app = express()
 const port = process.env.PORT || 8080
 const targetUrls = (process.env.TARGET_URLS || 'http://example.com').split(',').map((url) => url.trim())
 
+// CORS configuration
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN || true, // In production, set specific origins
+  credentials: true, // Allow cookies
+  methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}
+app.use(cors(corsOptions))
+log('info', `CORS enabled with origin: ${corsOptions.origin}`)
+
 // app.use(express.json())
 const payloadLimit = process.env.PAYLOAD_LIMIT || '1mb'
 app.use(bodyParser.json({ limit: payloadLimit }))
 app.use(bodyParser.urlencoded({ extended: false, limit: payloadLimit }))
+app.use(cookieParser())
 log('info', `Payload limit is: ${payloadLimit}`)
 
 // Serve static files

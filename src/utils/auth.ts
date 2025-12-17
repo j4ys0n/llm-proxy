@@ -11,9 +11,19 @@ const requestTracker = new RequestTracker()
 
 
 export const tokenMiddleware: RequestHandler = (req: Request, res: Response, next: NextFunction) => {
-  const authHeader = req.headers.authorization
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.split(' ')[1]
+  // Try to get token from cookie first, then fall back to Authorization header
+  let token: string | undefined
+
+  // Check cookie (preferred for web UI)
+  if (req.cookies && req.cookies.auth_token) {
+    token = req.cookies.auth_token
+  }
+  // Fall back to Authorization header (for API clients)
+  else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+    token = req.headers.authorization.split(' ')[1]
+  }
+
+  if (token) {
     try {
       const decoded = jwt.verify(token, jwtSecret, {
         algorithms: ['HS256'],
@@ -26,8 +36,8 @@ export const tokenMiddleware: RequestHandler = (req: Request, res: Response, nex
       res.status(401).json({ error: 'Invalid token' })
     }
   } else {
-    log('warn', 'Authorization header missing or invalid')
-    res.status(401).json({ error: 'Missing or invalid Authorization header' })
+    log('warn', 'Authentication required: no token found')
+    res.status(401).json({ error: 'Authentication required' })
   }
 }
 
