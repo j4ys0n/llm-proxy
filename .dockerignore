@@ -45,4 +45,3 @@ jest.config.js
 .editorconfig
 .prettierrc
 .eslintrc*
-tsconfig.json
